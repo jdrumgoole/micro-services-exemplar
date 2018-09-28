@@ -9,6 +9,8 @@ flask-wtf = "*"
 pymongo = "*"
 mimesis = "*"
 dnspython = "*"
+mtools = "*"
+psutil = "*"
 
 [dev-packages]
 

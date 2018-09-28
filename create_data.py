@@ -2,20 +2,20 @@ import argparse
 import random
 import string
 import pymongo
-from mimesis import Person, Code, ClothingSize
+from mimesis import Person, Code, ClothingSize,Payment
 from mimesis.enums import EANFormat
+from datetime import datetime
 
 
-def insert(collection, items):
+def insert(collection, items, batch_size=1000):
     insert_list = []
-    for i, item in enumerate(items,1):
-        print(f"{i}. {item}")
+    for i, item in enumerate(items, 1):
         insert_list.append(item)
-        if i % 1000 == 0:
+        if i % batch_size == 0:
             collection.insert_many(insert_list)
             insert_list = []
     if len(insert_list) > 0:
-        users_collection.insert_many(insert_list)
+        collection.insert_many(insert_list)
 
     return i
 
@@ -27,7 +27,7 @@ class RandomProduct(object):
 
         self._code = Code()
         self._clothing_size = ClothingSize()
-
+        self._product_map = {}
         self._products = {1: 'dress',
                           2: 'scarf',
                           3: 'Jeans',
@@ -48,17 +48,23 @@ class RandomProduct(object):
             raise ValueError( f"Bad Selector {selector}")
 
         product = {"name": self._products[selector],
-                   "EAN": self._code.ean(EANFormat.EAN8),
+                   "ts" : datetime.utcnow(),
+                   "_id": self._code.ean(EANFormat.EAN8),
                    "size": self._clothing_size.international_size(),
+                   "price": random.randint(10, 100),
                    "colour": "#{:06x}".format(random.randint(0, 0xFFFFFF))}
 
         return product
 
     def create_products(self, count=1000):
         segment = round(count / len(self._products.keys()))
-        for i in self._products.keys():
+        for i,k in enumerate(self._products.keys()):
             for _ in range(segment):
-                yield self.create_product(i)
+                self._product_map[i] = self.create_product(k)
+                yield self._product_map[i]
+
+    def product_map(self):
+        return self._product_map
 
     def create_product_collection(self, collection, size):
         insert(collection, self.create_products(size))
@@ -79,30 +85,58 @@ class RandomUser(object):
     def random_user(self):
 
         user = {"name": self._person.full_name(),
+                "ts" : datetime.utcnow(),
                 "username": self._person.email(),
                 "password": self._person.password(),
-                "userid": self._id,
-                "language": self._person.language()}
+                "_id": self._id,
+                "language": self._person.language(),
+                "basket_id": f"basket_{self._id}"}
         self._id += 1
         return user
 
     def random_users(self, count=1000):
-        for _ in range(count):
-            yield self.random_user()
+        for i in range(count):
+            user=self.random_user()
+            print( "{}. Creating '{}'".format(i, user["name"]))
+            yield user
 
 
-def create_users(collection, start_id=None):
-
+def create_users(users_collection, count, start_id=None):
 
     user_gen = RandomUser(users_collection, start_id)
     users_collection.create_index("username")
+    insert(users_collection, user_gen.random_users(count))
 
-    insert(users_collection, user_gen.random_users(args.usercount))
 
 def create_products(collection, count):
 
     products = RandomProduct()
     insert(collection, products.create_products(count))
+    return products.product_map()
+
+
+def create_basket_list(users_collection, product_map):
+
+    for user in users_collection.find():
+        print("Creating {}".format(user["basket_id"]))
+
+        product_list={}
+        no_of_products = random.randint(0,4)
+        for i in range(no_of_products):
+            product_sample = random.randint(0, len(product_map) -1)
+            if no_of_products > 0:
+                product = product_map[product_sample]
+
+                product_list[product["_id"]] = random.randint(1,4)
+                print("Adding product'{}' to {}".format(product["_id"], user["basket_id"]))
+
+        yield {"ts": datetime.utcnow(),
+               "basket_id": user["basket_id"],
+               "products": product_list}
+
+
+def create_baskets(baskets_collection,  items):
+    insert(baskets_collection, items)
 
 
 if __name__ == "__main__":
@@ -114,7 +148,10 @@ if __name__ == "__main__":
     parser.add_argument("--drop", default=False, action="store_true", help="Drop the users database")
     parser.add_argument("--startid", type=int, default=1,  help="Start creating userids from this value")
     parser.add_argument("--users", default=False, action="store_true", help="Create users")
-    parser.add_argument("--products", default=False, action="store_true", help="create products")
+    parser.add_argument("--products", default=False, action="store_true", help="create products collection")
+    parser.add_argument("--baskets", default=False, action="store_true", help="create baskets collection")
+    parser.add_argument("--indexes", default=False, action="store_true", help="make indexes")
+    parser.add_argument("--all", action="store_true", default=False, help="make all data")
     args = parser.parse_args()
 
     client = pymongo.MongoClient(host=args.host)
@@ -122,18 +159,34 @@ if __name__ == "__main__":
     users_collection = db["users"]
     baskets_collection = db["baskets"]
     products_collection = db["products"]
+    orders_collection = db["orders"]
+
+    users_collection.create_index('ts')
+    baskets_collection.create_index('ts')
+    products_collection.create_index('ts')
+    orders_collection.create_index('ts')
 
     if args.drop:
         users_collection.drop()
         products_collection.drop()
+        baskets_collection.drop()
+        orders_collection.drop()
 
-    if args.users:
-        create_users(users_collection, args.startid)
+    if args.indexes or args.all:
+        users_collection.create_index('ts')
+        baskets_collection.create_index('ts')
+        products_collection.create_index('ts')
+        orders_collection.create_index('ts')
 
-    if args.products:
-        create_products(products_collection,1000)
+    if args.users or args.all:
 
+        create_users(users_collection, args.usercount, args.startid)
 
+    if args.products or args.all:
+        product_map = create_products(products_collection, 100)
+
+    if args.baskets or args.all:
+        create_baskets(baskets_collection, create_basket_list(users_collection, product_map))
 
 
 
