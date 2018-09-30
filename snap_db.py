@@ -20,21 +20,25 @@ if __name__ == "__main__":
 
     client = pymongo.MongoClient(host=args.host)
 
-    (watch_db_name, sep, watch_collection_name) = args.watch.partition(".")
-    (snap_db_name, sep, snap_collection_name) = args.snap.partition(".")
+    watch_collection = None
+    snap_collection = None
 
-    watch_db = client[watch_db_name]
-    watch_collection = watch_db[watch_collection_name]
+    if args.snap:
+        (snap_db_name, sep, snap_collection_name) = args.snap.partition(".")
+        snap_db = client[snap_db_name]
+        snap_collection = snap_db[snap_collection_name]
+        print(f"output to {args.snap}")
+    if args.watch:
+        (watch_db_name, sep, watch_collection_name) = args.watch.partition(".")
+        watch_db = client[watch_db_name]
+        watch_collection = watch_db[watch_collection_name]
+        print(f"Watching:{args.watch}\n")
 
-    snap_db = client[snap_db_name]
-    snap_collection = snap_db[snap_collection_name]
 
     try:
         while True:
             print("Creating new watch cursor")
             watch_cursor = watch_collection.watch()
-            print(f"Watching:{args.watch}\n")
-            print(f"output to {args.snap}")
 
             for d in watch_cursor:
                 if d["operationType"] == "invalidate":
@@ -50,7 +54,9 @@ if __name__ == "__main__":
                     print("cluster time : {}".format(d["clusterTime"].as_datetime()))
                     print("collection   : {}.{}".format(d["ns"]["db"], d["ns"]["coll"]))
                     print("doc          : {}".format(d["fullDocument"]))
-                    snap_collection.replace_one({"_id": d["fullDocument"]["_id"]}, d["fullDocument"], upsert=True)
+                    if snap_collection:
+                        del d["fullDocument"]["_id"]
+                        snap_collection.replace_one({"basket_id": d["fullDocument"]["basket_id"]}, d["fullDocument"], upsert=True)
 
     except KeyboardInterrupt:
         print("Closing watch cursor")

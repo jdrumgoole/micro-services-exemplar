@@ -127,6 +127,7 @@ if __name__ == "__main__":
     baskets_collection = db["baskets"]
     products_collection = db["products"]
     orders_collection = db["orders"]
+    orders_collection.create_index("basket_id")
 
     basket_mgr = BasketManager(baskets_collection, products_collection, orders_collection)
     while True:

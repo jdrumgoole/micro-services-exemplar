@@ -1,5 +1,5 @@
-MHOST=mongodb://localhost:27017/?replicaset=ecom
-
+#MHOST=mongodb://localhost:27017/?replicaset=ecom
+MHOST=mongodb+srv://jdrumgoole:erasmus@vendor-gl0aq.azure.mongodb.net/test?retryWrites=true
 all:
 	python create_data.py --host ${MHOST} --drop --users --products --baskets
 
@@ -26,10 +26,11 @@ init_server:
 		echo "Making new mlaunch environment in 'data'";\
 		mlaunch init --replicaset --name "ecom";\
         fi
-clean:
+clean: clean_db
 	rm -rf data
-	python create_data.py --${MHOST} --drop
 
+clean_db:
+		python create_data.py --host ${MHOST} --drop
 
 start_server:
 	@echo "Starting MongoDB replica set"
