@@ -34,7 +34,6 @@ if __name__ == "__main__":
         watch_collection = watch_db[watch_collection_name]
         print(f"Watching:{args.watch}\n")
 
-
     try:
         while True:
             print("Creating new watch cursor")
@@ -53,10 +52,11 @@ if __name__ == "__main__":
                     print("local time   : {}".format(datetime.utcnow()))
                     print("cluster time : {}".format(d["clusterTime"].as_datetime()))
                     print("collection   : {}.{}".format(d["ns"]["db"], d["ns"]["coll"]))
-                    print("doc          : {}".format(d["fullDocument"]))
+                    print("doc          :")
+                    pprint.pprint(d["fullDocument"])
                     if snap_collection:
                         del d["fullDocument"]["_id"]
-                        snap_collection.replace_one({"basket_id": d["fullDocument"]["basket_id"]}, d["fullDocument"], upsert=True)
+                        snap_collection.insert_one({"basket_id": d["fullDocument"]["basket_id"]}, d["fullDocument"])
 
     except KeyboardInterrupt:
         print("Closing watch cursor")

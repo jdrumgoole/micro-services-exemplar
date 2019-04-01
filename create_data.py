@@ -48,7 +48,7 @@ class RandomProduct(object):
             raise ValueError( f"Bad Selector {selector}")
 
         product = {"name": self._products[selector],
-                   "ts" : datetime.utcnow(),
+                   "ts": datetime.utcnow(),
                    "_id": self._code.ean(EANFormat.EAN8),
                    "size": self._clothing_size.international_size(),
                    "price": random.randint(10, 100),
@@ -121,7 +121,7 @@ def create_basket_list(users_collection, product_map):
         print("Creating {}".format(user["basket_id"]))
 
         product_list={}
-        no_of_products = random.randint(0,4)
+        no_of_products = random.randint(0, 4)
         for i in range(no_of_products):
             product_sample = random.randint(0, len(product_map) -1)
             if no_of_products > 0:

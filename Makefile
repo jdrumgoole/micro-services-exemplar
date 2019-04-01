@@ -1,10 +1,11 @@
-#MHOST=mongodb://localhost:27017/?replicaset=ecom
-MHOST=mongodb+srv://jdrumgoole:erasmus@vendor-gl0aq.azure.mongodb.net/test?retryWrites=true
+PORT=27018
+MHOST=mongodb://localhost:${PORT}/?replicaset=ecom
+
 all:
-	python create_data.py --host ${MHOST} --drop --users --products --baskets
+	python3 create_data.py --host ${MHOST} --drop --users --products --baskets
 
 create_users:
-	python create_data.py --host ${MHOST} --drop --users
+	python3 create_data.py --host ${MHOST} --drop --users
 
 create_products:
 	python3 create_data.py --host ${MHOST} --drop --products
@@ -24,13 +25,13 @@ init_server:
 		echo "Replica set Already configured in 'data' start with make start_server";\
 	else\
 		echo "Making new mlaunch environment in 'data'";\
-		mlaunch init --replicaset --name "ecom";\
+		mlaunch init --port ${PORT} --replicaset --name "ecom";\
         fi
 clean: clean_db
 	rm -rf data
 
 clean_db:
-		python create_data.py --host ${MHOST} --drop
+		python3 create_data.py --host ${MHOST} --drop
 
 start_server:
 	@echo "Starting MongoDB replica set"

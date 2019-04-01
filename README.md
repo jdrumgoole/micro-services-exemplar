@@ -1,5 +1,6 @@
 # micro-services-exemplar
-How to use MongoDB and MicroServices.
+How to use MongoDB and MicroServices. This example represents a simple
+e-commerce platform. The 
 
 Use create_data.py to make data.
 

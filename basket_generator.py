@@ -76,11 +76,13 @@ class BasketManager(object):
                                                          "basket_id": basket["basket_id"],
                                                          "total_price": total_price,
                                                          "reference": basket["_id"]},
-                                                        session=session)
+                                                         session=session)
         print("Created order for {}".format(basket["basket_id"]))
         basket["order_id"] = one_result.inserted_id
         del basket["_id"]
-        basket["ts"] = datetime.utcnow()
+        basket = {"ts": datetime.utcnow(),
+                  "basket_id": basket["basket_id"],
+                  "products": {}}
         self._baskets_collection.insert_one(basket, session=session)
 
     def buy(self, basket_id):
