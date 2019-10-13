@@ -47,16 +47,14 @@ if __name__ == "__main__":
                     print("Closing cursor")
                     watch_cursor.close()
                     break
-                else:
-                    #pprint.pprint(d)
-                    print("local time   : {}".format(datetime.utcnow()))
-                    print("cluster time : {}".format(d["clusterTime"].as_datetime()))
-                    print("collection   : {}.{}".format(d["ns"]["db"], d["ns"]["coll"]))
-                    print("doc          :")
-                    pprint.pprint(d["fullDocument"])
-                    if snap_collection:
+                elif snap_collection:
+                    if len(d["fullDocument"]["products"]) > 0: # we sold something
                         del d["fullDocument"]["_id"]
-                        snap_collection.insert_one({"basket_id": d["fullDocument"]["basket_id"]}, d["fullDocument"])
+                        print("local time   : {}".format(datetime.utcnow()))
+                        print("cluster time : {}".format(d["clusterTime"].as_datetime()))
+                        print("collection   : {}.{}".format(d["ns"]["db"], d["ns"]["coll"]))
+                        pprint.pprint(d["fullDocument"])
+                        snap_collection.insert_one({"basket_id": d["fullDocument"]["basket_id"], "doc": d["fullDocument"]})
 
     except KeyboardInterrupt:
         print("Closing watch cursor")

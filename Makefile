@@ -1,23 +1,25 @@
 PORT=27018
-MHOST=mongodb://localhost:${PORT}/?replicaset=ecom
+#MHOST=mongodb://localhost:${PORT}/?replicaset=ecom
+
+MHOST=${MDBHOST}
 
 all:
-	python3 create_data.py --host ${MHOST} --drop --users --products --baskets
+	python3 create_data.py --host "${MHOST}" --drop --users --products --baskets
 
 create_users:
-	python3 create_data.py --host ${MHOST} --drop --users
+	python3 create_data.py --host "${MHOST}" --drop --users
 
 create_products:
-	python3 create_data.py --host ${MHOST} --drop --products
+	python3 create_data.py --host "${MHOST}" --drop --products
 
 create_baskets:
-	python3 create_data.py --host ${MHOST} --drop --baskets
+	python3 create_data.py --host "${MHOST}" --drop --baskets
 
 basket_generator:
-	python3 basket_generator.py --host ${MHOST}
+	python3 basket_generator.py --delay 3 --host "${MHOST}"
 
 snap_db:
-	python3 snap_db.py --host ${MHOST} --watch ECOM.baskets --snap ECOM.baskets_snap
+	python3 snap_db.py --host "${MHOST}" --watch ECOM.baskets --snap ECOM.baskets_snap
 
 init_server:
 	@echo "Setting up replica set";\
@@ -31,7 +33,7 @@ clean: clean_db
 	rm -rf data
 
 clean_db:
-		python3 create_data.py --host ${MHOST} --drop
+		python3 create_data.py --host "${MHOST}" --drop
 
 start_server:
 	@echo "Starting MongoDB replica set"
