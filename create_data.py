@@ -1,6 +1,8 @@
 import argparse
 import random
 import string
+from enum import Enum
+
 import pymongo
 from mimesis import Person, Code, Clothing,Payment
 from mimesis.enums import EANFormat
@@ -21,56 +23,65 @@ def insert(collection, items, batch_size=1000):
     return i
 
 
-class RandomProduct(object):
+
+class RandomProductGenerator(object):
+
+    PRODUCT_TYPE = {1: 'dress',
+                    2: 'scarf',
+                    3: 'Jeans',
+                    4: 'Hat',
+                    5: 'Skirt',
+                    6: 'Chinos',
+                    7: 'belt',
+                    9: 'blouse',
+                    10: 'shoes',
+                    11: 'boxer shorts',
+                    12: 'socks'}
 
     def __init__(self):
 
-        self._code = Code()
-        self._clothing = Clothing()
+        self._code = Code() # generate product codes
+        self._clothing = Clothing() # generate clothing dat
         self._product_map = {}
-        self._products = {1: 'dress',
-                          2: 'scarf',
-                          3: 'Jeans',
-                          4: 'Hat',
-                          5: 'Skirt',
-                          6: 'Chinos',
-                          7: 'belt',
-                          9: 'blouse',
-                          10: 'shoes',
-                          11: 'boxer shorts',
-                          12: 'socks'}
+        self._product_ids = []
 
-    def create_product(self, selector=None):
+    def create_one_product(self, selector=None):
 
         if selector is None:
-            selector = random.randint(1,12)
-        elif selector not in self._products.keys():
+            selector = random.randint(1, len(self.PRODUCT_TYPE))
+        elif selector not in self.PRODUCT_TYPE.keys():
             raise ValueError( f"Bad Selector {selector}")
 
-        product = {"name": self._products[selector],
+        product = {"name": self.PRODUCT_TYPE[selector],
                    "ts": datetime.utcnow(),
-                   "_id": self._code.ean(EANFormat.EAN8),
+                   "product_id": self._code.ean(EANFormat.EAN8),
                    "size": self._clothing.international_size(),
                    "price": random.randint(10, 100),
                    "colour": "#{:06x}".format(random.randint(0, 0xFFFFFF))}
 
+        self._product_ids = product["product_id"]
         return product
 
-    def random_products(self, count=1000):
-        segment = round(count / len(self._products.keys()))
+    def random_product_id(self):
+        selector = random.randint(0, len(self._product_ids) - 1)
+        return self._product_ids[selector]
+
+    def generate_random_products(self, count=1000):
+        segment = round(count / len(self.PRODUCT_TYPE.keys()))  # generate equal numbers of products for each type
         product_count = 0
-        for i,k in enumerate(self._products.keys()):
-            for _  in range(segment):
+        for i,k in enumerate(self.PRODUCT_TYPE.keys()):
+            for _ in range(segment):
                 product_count = product_count + 1
-                print(f"{product_count} creating product {self._products[k]}")
-                self._product_map[i] = self.create_product(k)
+                print(f"{product_count} creating product {self.PRODUCT_TYPE[k]}")
+                self._product_map[i] = self.create_one_product(k)
                 yield self._product_map[i]
 
+    @property
     def product_map(self):
         return self._product_map
 
     def create_product_collection(self, collection, size):
-        insert(collection, self.random_products(size))
+        insert(collection, self.generate_random_products(size))
 
 
 class RandomUser(object):
@@ -91,7 +102,7 @@ class RandomUser(object):
                 "ts" : datetime.utcnow(),
                 "username": self._person.email(),
                 "password": self._person.password(),
-                "_id": self._id,
+                "user_id": self._id,
                 "language": self._person.language(),
                 "basket_id": f"basket_{self._id}"}
         self._id += 1
@@ -101,7 +112,7 @@ class RandomUser(object):
         for i in range(count):
             user=self.random_user()
             name=user["name"]
-            print( f"{i+1}. Creating '{name}'")
+            print(f"{i+1}. Creating '{name}'")
             yield user
 
 
@@ -114,32 +125,29 @@ def create_users(users_collection, count, start_id=None):
 
 def create_products(collection, count):
 
-    products = RandomProduct()
-    insert(collection, products.random_products(count))
-    return products.product_map()
+    products = RandomProductGenerator()
+    products.create_product_collection(collection, count)
+    return products
 
 
-def create_basket_list(users_collection, product_map):
+def create_basket_list(users_collection, products):
 
     for user in users_collection.find():
-        print("Creating {}".format(user["basket_id"]))
+        print(f"Creating {user['basket_id']}")
 
-        product_list={}
+        product_list = {}
         no_of_products = random.randint(0, 4)
         for i in range(no_of_products):
-            product_sample = random.randint(0, len(product_map) -1)
-            if no_of_products > 0:
-                product = product_map[product_sample]
-
-                product_list[product["_id"]] = random.randint(1,4)
-                print("Adding product'{}' to {}".format(product["name"], user["basket_id"]))
-            else:
-                print(f"No products added to basket {user['basket_id']}")
+            product_sample = random.randint(0, len(products.product_map) -1)
+            product = products.product_map[product_sample]
+            product_list[product["product_id"]] = products.random_product_id()
+            print(f"Adding product'{product['name']}' to {user['basket_id']}")
+        else:
+            print(f"No products added to basket {user['basket_id']}")
 
         yield {"ts": datetime.utcnow(),
                "basket_id": user["basket_id"],
                "products": product_list}
-
 
 def create_baskets(baskets_collection,  items):
     insert(baskets_collection, items)
@@ -150,7 +158,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--host", default="mongodb://localhost:27017", help="mongodb URL for host")
-    parser.add_argument("--usercount", type=int, default=10000, help="create this many random users")
+    parser.add_argument("--usercount", type=int, default=100000, help="create this many random users")
+    parser.add_argument("--productcount", type=int, default=100000, help="create this many random products")
     parser.add_argument("--drop", default=False, action="store_true", help="Drop the users database")
     parser.add_argument("--startid", type=int, default=1,  help="Start creating userids from this value")
     parser.add_argument("--users", default=False, action="store_true", help="Create users")
@@ -188,12 +197,10 @@ if __name__ == "__main__":
         create_users(users_collection, args.usercount, args.startid)
 
     if args.products or args.all:
-        product_map = create_products(products_collection, 100)
+        products = create_products(products_collection, args.productcount)
 
     if args.baskets or args.all:
-        create_users(users_collection, args.usercount, args.startid)
-        product_map = create_products(products_collection, 100)
-        create_baskets(baskets_collection, create_basket_list(users_collection, product_map))
+        create_baskets(baskets_collection, create_basket_list(users_collection, products))
 
 
 
